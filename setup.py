@@ -6,9 +6,6 @@
 from setuptools import setup
 import pkg_resources
 
-self_qindex = "qindex_cmcat_python_pulse_setup"
-self_usage = "python3 $qindex_cmcat_python_pulse_setup_py py2app --packages=wx"
-
 #   Bug with py2app/pyinstaller/setuptools, or, the reason this thing didn't work the first time.
 #   {{{2
 #       Previous:

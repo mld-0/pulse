@@ -10,8 +10,8 @@ self_name="mld_pulse_run_setup"
 #	{{{2
 
 #set -o errexit   # abort on nonzero exitstatus
-#set -o nounset   # abort on unbound variable
-#set -o pipefail  # don't hide errors within pipes
+set -o nounset   # abort on unbound variable
+set -o pipefail  # don't hide errors within pipes
 
 _pulse_dir="$mld_src/pulse"
 _bin_python_build="$HOME/.pyenv/shims/python3"
