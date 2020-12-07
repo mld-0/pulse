@@ -32,9 +32,10 @@ import sys, getopt
 import os
 from os.path import expanduser
 import importlib
-from pathlib import Path
 from datetime import timedelta 
 from datetime import date
+
+from dateutil.tz import tzlocal
 
 from datetime import timedelta, date
 
@@ -174,7 +175,7 @@ class ScheduleCalculator(object):
         except OSError:
             open(fname, 'a').close()
     #   }}}
-        
+
     #   LockFile filenames are created from system hostname -> No two machines running Pulse via the same cloud share should have the same hostname
     #   Created: (2020-08-30)-(1206-27)
     def Get_Local_LockFile_FileName(self):
@@ -209,7 +210,7 @@ class ScheduleCalculator(object):
         else:
             sys.stderr.write("%s, error, lockfile_local_path not found\n\t%s\n" % (func_name, str(lockfile_local_path)))
             return 2
-        
+
         return 0
     #   }}}
 
@@ -850,15 +851,15 @@ class ScheduleCalculator(object):
         t_elapsed = round(t_end - t_start, 2)
         if (func_printdebug == 1):
             sys.stderr.write("%s, check dt=(%s)\n" % (func_name, str(t_elapsed)))
-        
+
         if (func_printdebug == 1):
-            sys.stderr.write("copy_path=(%s)\n" % str(copy_path))
-            sys.stderr.write("source_path=(%s)\n" % str(source_path))
-            sys.stderr.write("source_filtered_hash=(%s)\n" % source_filtered_hash)
-            sys.stderr.write("copy_hash=(%s)\n" % copy_hash)
-            sys.stderr.write("source_filtered_lines=(%s)\n" % source_filtered_lines)
-            sys.stderr.write("copy_lines=(%s)\n" % copy_lines)
-            
+            sys.stderr.write("\tcopy_path=(%s)\n" % str(copy_path))
+            sys.stderr.write("\tsource_path=(%s)\n" % str(source_path))
+            sys.stderr.write("\tsource_filtered_hash=(%s)\n" % source_filtered_hash)
+            sys.stderr.write("\tcopy_hash=(%s)\n" % copy_hash)
+            sys.stderr.write("\tsource_filtered_lines=(%s)\n" % source_filtered_lines)
+            sys.stderr.write("\tcopy_lines=(%s)\n" % copy_lines)
+
 
         #   (Disabled) flag_delete_previous
         #   {{{
@@ -1349,6 +1350,9 @@ class PulseApp(rumps.App):
     #  3 is our default value, the actual value comes from "poll_dt_var = 'mldsp_schedule_poll_dt'"
     poll_dt = 5  
 
+    DIR_delta_sign_previous = 0
+    Can_delta_sign_previous = 0
+
     #   IMPORT ~/._qindex_PythonReader.py  AS  qindexReader
     #filename_qindexReader = "._qindex_PythonReader.py"
     #filename_qindexReader = None
@@ -1372,23 +1376,10 @@ class PulseApp(rumps.App):
 
     scheduleCalc = None
     #qVar_unix_schedule = "qindex_unix_schedule"
-    qpath_log_pulse = "/tmp/pulse.log"
+    path_log_edges = "/tmp/pulse-edges.log"
 
-    #qPath_schedule_unix = "" 
 
-    ##   unix_schedule: Get schedule parameters from sh script, lookup path from qindex   
-    #DIR_onset_var = "mldsp_schedule_onset_DIR"
-    #DIR_HL_var = "mldsp_schedule_HL_DIR"
-    #DIR_filter_var = "mldsp_schedule_filter_DIR"
-    #Can_onset_var = "mldsp_schedule_onset_Can"
-    #Can_HL_var = "mldsp_schedule_HL_Can"
-    #Can_filter_var = "mldsp_schedule_filter_Can"
-    #poll_dt_var = "mldsp_schedule_poll_dt"
-
-    #qVar_pulse_deltafile = "qindex_pulse_deltafile_inhome"
-    #qPath_pulse_deltafile = ""
-
-    #qvar_log_pulse = "qindex_log_pulse"
+    path_log_peaks = os.path.join(Path.home(), ".pulse-peaks.log")
 
     #   Get DTS for current datetime
     datetime_format_str="(%Y-%m-%d)-(%H%M-%S)"
@@ -1404,7 +1395,6 @@ class PulseApp(rumps.App):
     Can_qty_now = 0 #scheduleCalc_import.main(Can_args)
     DIR_delta_sign = 0
     Can_delta_sign = 0
-
 
     #   Do not display pulse_deltafile elapsed value if it the 'current time' value is more than pulse_deltafile_split_seconds ago
     pulse_deltafile_split_seconds = 5 * 60
@@ -1457,31 +1447,12 @@ class PulseApp(rumps.App):
 
         #   TODO: 2020-11-16T19:40:06AEDT read variables from <>
 
-        #self.DIR_onset = self.qindexReader.get_var(self.DIR_onset_var, self.qPath_schedule_unix)
-        #self.DIR_HL = self.qindexReader.get_var(self.DIR_HL_var, self.qPath_schedule_unix)
-        #self.DIR_filter = self.qindexReader.get_var(self.DIR_filter_var, self.qPath_schedule_unix)
-        #self.Can_onset = self.qindexReader.get_var(self.Can_onset_var, self.qPath_schedule_unix)
-        #self.Can_HL = self.qindexReader.get_var(self.Can_HL_var, self.qPath_schedule_unix)
-        #self.Can_filter = self.qindexReader.get_var(self.Can_filter_var, self.qPath_schedule_unix)
-
         self.DIR_onset = 20 
         self.DIR_HL = 50
         self.DIR_filter = "D-IR"
         self.Can_onset = "3"
         self.Can_HL = "35"
         self.Can_filter = "Can-S"
-
-        #self.qPath_schedule_unix = self.qindexReader.get_var(self.qVar_unix_schedule)
-        #self.qPath_pulse_deltafile = self.qindexReader.get_var(self.qVar_pulse_deltafile)
-        #self.qpath_log_pulse = self.qindexReader.get_var(self.qvar_log_pulse)
-
-        #self.qpath_log_pulse = self.qindexReader.get_var(self_qvar_log)
-        #self.qpath_log_pulse = ""
-        #self.qpath_pulse_edges_DIR = self.qindexReader.get_var(self.qvar_pulse_edges_DIR)
-
-        #poll_dt_str = self.qindexReader.get_var(self.poll_dt_var, self.qPath_schedule_unix)
-
-        #self.poll_dt = int(poll_dt_str)
 
         self.DIR_args = [ "--printoff", "--now", "--filter", str(self.DIR_filter), "--onset", str(self.DIR_onset), "--halflife", str(self.DIR_HL) ]
         self.Can_args = [ "--printoff", "--now", "--filter", str(self.Can_filter), "--onset", str(self.Can_onset), "--halflife", str(self.Can_HL), "--freezecopy" ]
@@ -1521,38 +1492,12 @@ class PulseApp(rumps.App):
         _list_menu = [ 'Quit' ]
         _app_name = "Pulse"
 
-        #self.app = super()
-        #super(PulseApp, self).__init__(_app_name, menu=_list_menu, quit_button=None)
-        #self.app = rumps.App(menu=_list_menu, quit_button=None)
-        #self.app = rumps.App(_app_name)
-        #self.app = super().__init__("Hello There", menu=_list_menu, quit_button=None)
-        #self.app = rumps.App("Hello There", menu=_list_menu, quit_button=None)
-
         super().__init__("Hello There", menu=_list_menu, quit_button=None)
         self.timer = rumps.Timer(self.func_poll, self.poll_dt)
         self.timer.start()
 
-        #self.app.menu = ["Print Something", "On/Off Test"]
-        #self.app.menu = [ 'Quit App' ]
-        #print("self.qPath_pulse_deltafile=" + str(self.qPath_pulse_deltafile))
-
-        ##   Read in values, from: self.qpath_pulse_edges_DIR, to: self.edges_list_DIR 
-        #self.edges_list_DIR = []
-        ##with open(self.qpath_pulse_edges_DIR) as f:
-        #try:
-        #    f = open(self.qpath_pulse_edges_DIR, "r")
-        #    line_num_val = 0.0
-        #    for line_str in f:
-        #        line_num_val = float(line_str.strip())
-        #        self.edges_list_DIR.append(line_num_val)
-        #    f.close()
-        #except Exception as e:
-        #    sys.stderr.write("error reading file qpath_pulse_edges_DIR\n")
-        #    sys.stderr.write("e=(%s)\n\n" % str(e))
-        #sys.stderr.write("read in edges_list_DIR=(%s)\n" % str(self.edges_list_DIR))
-                
-        message_str = "Done __init__()\n"
-        self.WriteLog(message_str)
+        #message_str = "Done __init__()\n"
+        #self.WriteLogEdges(message_str)
     #   }}}
 
     #   About: Handle closure, call scheduleCalc.Delete_Local_LockFile()
@@ -1659,6 +1604,14 @@ class PulseApp(rumps.App):
         return dts_str
     #   }}}
 
+    def WriteLogPeaks(self, message_str):
+        datetime_str = datetime.datetime.now(tzlocal()).strftime("%Y-%m-%dT%H:%M:%S%Z")
+        _delim = "\t"
+        output_str = datetime_str + _delim + message_str + "\n"
+        sys.stderr.write("output_str=(%s)" % str(output_str))
+        with open(self.path_log_peaks, "a") as f:
+            f.write(output_str)
+
     #   Created: (2020-06-24)-(2252-45)
     def EdgeNotifications(self):
     #   {{{
@@ -1697,7 +1650,7 @@ class PulseApp(rumps.App):
                 if (loop_edge_status == 0):
                     message_str = "Rising Edge, DIR, %s\n" % (str(loop_edge_qty))
                     sys.stderr.write(message_str)
-                    self.WriteLog(message_str)
+                    self.WriteLogEdges(message_str)
                     if (self.flag_notify_edges_DIR == True and self.flag_notify_rising_edges == True):
                         notification_title = "Falling Edge"
                         notification_subtitle = "DIR"
@@ -1712,7 +1665,7 @@ class PulseApp(rumps.App):
                 if (loop_edge_status == 1):
                     message_str = "Falling Edge, DIR, %s\n" % (str(loop_edge_qty))
                     sys.stderr.write(message_str)
-                    self.WriteLog(message_str)
+                    self.WriteLogEdges(message_str)
                     if (self.flag_notify_edges_DIR == True and self.flag_notifiy_falling_edges == True):
                         notification_title = "Falling Edge"
                         notification_subtitle = "DIR"
@@ -1727,16 +1680,17 @@ class PulseApp(rumps.App):
     #   }}}
 
     #   Created: (2020-06-25)-(1734-43)
-    def WriteLog(self, message_str):
+    def WriteLogEdges(self, message_str):
     #   {{{
         func_name = inspect.currentframe().f_code.co_name
         global self_flag_log
         if (self_flag_log == True):
+            datetime_str = datetime.datetime.now(tzlocal()).strftime("%Y-%m-%dT%H:%M:%S%Z")
             epoch_str = str(int(time.time()))
             #epoch_str = str(int(epoch_str))
-            path_log = self.qpath_log_pulse
+            path_log = self.path_log_edges
             #f = open(path_log, "w")
-            output_str = epoch_str + "\t" + message_str
+            output_str = datetime_str + "\t" + message_str
             with open(path_log, "a") as logfile:
                 logfile.write(output_str)
     #   }}}
@@ -1798,128 +1752,97 @@ class PulseApp(rumps.App):
             source_mtime_dhms = self.scheduleCalc.ScheduleCalc_Seconds2DHMS(source_mtime_secs)
         except Exception as e:
             sys.stderr.write("%s, exception, scheduleCalc: %s, %s\n" % (func_name, str(type(e)), str(e)))
-        
-        date_now = datetime.datetime.now()
-        source_time_final_instance_DIR = self.scheduleCalc.TimeOfFinalInstance(str(self.DIR_filter))
-        DIR_update_delta_M = (date_now - source_time_final_instance_DIR).total_seconds() / 60 
-        DIR_update_delta_M = int(DIR_update_delta_M)
 
-        #source_time_final_instance_Can= self.scheduleCalc.TimeOfFinalInstance(str(self.Can_filter), )
-        source_time_final_instance_Can= self.scheduleCalc.TimeOfFinalInstance(str(self.Can_filter))
-        Can_update_delta_M = (date_now - source_time_final_instance_Can).total_seconds() / 60 
-        Can_update_delta_M = int(Can_update_delta_M)
-
-        d_delta = self.DIR_qty_now - self.DIR_qty_previous
-        c_delta = self.Can_qty_now - self.Can_qty_previous
-        #   <*>_delta_sign 
+        try:
+            date_now = datetime.datetime.now()
+            source_time_final_instance_DIR = self.scheduleCalc.TimeOfFinalInstance(str(self.DIR_filter))
+            DIR_update_delta_M = (date_now - source_time_final_instance_DIR).total_seconds() / 60 
+            DIR_update_delta_M = int(DIR_update_delta_M)
+            #source_time_final_instance_Can= self.scheduleCalc.TimeOfFinalInstance(str(self.Can_filter), )
+            source_time_final_instance_Can= self.scheduleCalc.TimeOfFinalInstance(str(self.Can_filter))
+            Can_update_delta_M = (date_now - source_time_final_instance_Can).total_seconds() / 60 
+            Can_update_delta_M = int(Can_update_delta_M)
+            d_delta = self.DIR_qty_now - self.DIR_qty_previous
+            c_delta = self.Can_qty_now - self.Can_qty_previous
+            #   <*>_delta_sign 
+            #   {{{
+            if (d_delta != 0):
+                d_sign = math.copysign(1, d_delta)
+                if (d_sign != self.DIR_delta_sign):
+                    self.DIR_delta_sign = d_sign
+            if (c_delta != 0):
+                c_sign = math.copysign(1, c_delta)
+                if (c_sign != self.Can_delta_sign):
+                    self.Can_delta_sign = c_sign
+            #   }}}
+            DIR_label_qty = "D" + str(round(self.DIR_qty_now, self._pulse_output_decimals))
+            Can_label_qty = "C" + str(round(self.Can_qty_now, self._pulse_output_decimals))
+        #   Add Labels: (🔺, 🔻)
         #   {{{
-        if (d_delta != 0):
-            d_sign = math.copysign(1, d_delta)
-            if (d_sign != self.DIR_delta_sign):
-                self.DIR_delta_sign = d_sign
-        if (c_delta != 0):
-            c_sign = math.copysign(1, c_delta)
-            if (c_sign != self.Can_delta_sign):
-                self.Can_delta_sign = c_sign
+            label_up = "🔺"
+            #   Note: (2020-06-16)-(0034-17) Disable downwards label -> set it to ""
+            #label_down="🔻"
+            label_down = " "
+            label_item_delta = "⏳"
+            #label_delta_postfix = "⏳"
+            label_delta_postfix = ""
+            label_delta_prefix = ""
+
+            #   If current loop qty is increasing/decreasing, and the previous qty was doing the opposite, log max/min value
+            if (self.DIR_delta_sign_previous < 0 and self.DIR_delta_sign > 0):
+                self.WriteLogPeaks("D-IR\tmin\t%s" % str(self.DIR_qty_now))
+            if (self.DIR_delta_sign_previous > 0 and self.DIR_delta_sign < 0):
+                self.WriteLogPeaks("D-IR\tmax\t%s" % str(self.DIR_qty_now))
+            if (self.Can_delta_sign_previous < 0 and self.Can_delta_sign > 0):
+                self.WriteLogPeaks("Can\tmin\t%s" % str(self.Can_qty_now))
+            if (self.Can_delta_sign_previous > 0 and self.Can_delta_sign < 0):
+                self.WriteLogPeaks("Can\tmax\t%s" % str(self.Can_qty_now))
+
+            self.DIR_delta_sign_previous = self.DIR_delta_sign
+            self.Can_delta_sign_previous = self.Can_delta_sign
+
+            if (self.DIR_delta_sign > 0):
+                DIR_label_qty += label_up
+            elif (self.DIR_delta_sign < 0):
+                DIR_label_qty += label_down
+            if (self.Can_delta_sign > 0):
+                Can_label_qty += label_up
+            elif (self.Can_delta_sign < 0):
+                Can_label_qty += label_down
+
         #   }}}
-        DIR_label_qty = "D" + str(round(self.DIR_qty_now, self._pulse_output_decimals))
-        Can_label_qty = "C" + str(round(self.Can_qty_now, self._pulse_output_decimals))
-    #   Add Labels: (🔺, 🔻)
-    #   {{{
-        label_up = "🔺"
-        #   Note: (2020-06-16)-(0034-17) Disable downwards label -> set it to ""
-        #label_down="🔻"
-        label_down = " "
+            poll_deltas_str = ""
+            if (self.flag_DIR_delta == True):
+                if (DIR_update_delta_M < self.update_delta_M_max):
+                    if (len(poll_deltas_str) > 0):
+                        poll_deltas_str += "|"
+                    poll_deltas_str += str(DIR_update_delta_M)
+            if (self.flag_Can_Delta == True):
+                if (Can_update_delta_M < self.update_delta_M_max):
+                    if (len(poll_deltas_str) > 0):
+                        poll_deltas_str += "|"
+                    poll_deltas_str += str(Can_update_delta_M) 
+            if (len(poll_deltas_str) > 0):
+                poll_deltas_str += label_item_delta
+            poll_str += poll_deltas_str
+            if (self.DIR_qty_now > self.poll_qty_threshold):
+                poll_str += DIR_label_qty
+            if (self.Can_qty_now > self.poll_qty_threshold):
+                poll_str += Can_label_qty
+            poll_str = poll_str.strip()
+            #self.app.title = poll_str
+            app.title = poll_str
+            schedule_poll_endtime = time.time()
+            schedule_poll_delta_ns = round(1000 * (schedule_poll_endtime - schedule_poll_starttime), 1)
+            report_str = poll_str + " poll_delta=(%s), file_update_delta=(%s)" % (schedule_poll_delta_ns, source_mtime_dhms)
+            sys.stderr.write("%s\n" % str(report_str))
+            sys.stderr.write("\n")
+            #   Call EdgeNotifications()
+            self.EdgeNotifications()
+            self.poll_count += 1
+        except Exception as e:
+            sys.stderr.write("%s, %s, Exception while updating label" % (type(e), str(e)))
 
-        label_item_delta = "⏳"
-        #label_delta_postfix = "⏳"
-        label_delta_postfix = ""
-        label_delta_prefix = ""
-
-        if (self.DIR_delta_sign > 0):
-            #DIR_label_qty += "(+)"
-            DIR_label_qty += label_up
-        elif (self.DIR_delta_sign < 0):
-            #DIR_label_qty += "(-)"
-            DIR_label_qty += label_down
-
-        if (self.Can_delta_sign > 0):
-            #Can_label_qty += "(+)"
-            Can_label_qty += label_up
-        elif (self.Can_delta_sign < 0):
-            #Can_label_qty += "(-)"
-            Can_label_qty += label_down
-    #   }}}
-
-        #   {{{
-        #   If flag_deltafile is 1, and the delta since the start of the vimh/vimfol interval is less than double the delta since the end
-        #if (flag_deltafile == 1) and ((pulse_deltafile_delta_start > deltafile_delta_mins_report_upper * 60) or (pulse_deltafile_delta_start < deltafile_delta_mins_report_lower * 60)):
-        #if (flag_deltafile == 1) and (pulse_deltafile_delta_start < 2 * pulse_deltafile_delta_end):
-        #   }}}
-
-        poll_deltas_str = ""
-
-        ##   If flag_deltafile is 1, and it has been less than 5 mins since the last dts in pulse_deltafile
-        #if (flag_deltafile == 1) and (pulse_deltafile_delta_end < self.pulse_deltafile_split_seconds):
-        #    #   DHMS value:
-        #    #pulse_deltafile_output_str = pulse_deltafile_delta_start_dhms
-        #    #   Mins value:
-        #    #   Ongoing: (2020-05-10)-(0353-33) qindex_cmcat_python_pulse_main; Alternatively, rather than mins, can we have dhm, dhms with the s chopped off?
-        #    delta_out_mins= int(pulse_deltafile_delta_start/60.0)
-        #    delta_out_count = "<>"
-        #    try:
-        #        delta_out_count = str(round(pulse_deltafile_count / (pulse_deltafile_delta_start / 60.0),1))
-        #    except Exception as e:
-        #        sys.stderr.write("e=(%s)\n" % str(e))
-        #    delta_out_count = "(" + str(delta_out_count) + ")"
-
-        #    #pulse_deltafile_output_str = ""
-        #    if (self.flag_deltafile_elapsed_min == True):
-        #        #pulse_deltafile_output_str = delta_out_mins + delta_out_count
-        #        if (delta_out_mins < self.update_delta_M_max):
-        #            #poll_deltas_str += str(delta_out_mins) + delta_out_count
-        #            poll_deltas_str += str(delta_out_mins) 
-        #    #else:
-        #        #pulse_deltafile_output_str = ""
-
-        #    #poll_str += label_delta_prefix + pulse_deltafile_output_str + label_delta_postfix
-        #    #poll_str += poll_str_DIR_delta + pulse_deltafile_output_str + label_delta_postfix
-
-        if (self.flag_DIR_delta == True):
-            if (DIR_update_delta_M < self.update_delta_M_max):
-                if (len(poll_deltas_str) > 0):
-                    poll_deltas_str += "|"
-                poll_deltas_str += str(DIR_update_delta_M)
-        if (self.flag_Can_Delta == True):
-            if (Can_update_delta_M < self.update_delta_M_max):
-                if (len(poll_deltas_str) > 0):
-                    poll_deltas_str += "|"
-                poll_deltas_str += str(Can_update_delta_M) 
-        if (len(poll_deltas_str) > 0):
-            poll_deltas_str += label_item_delta
-
-        poll_str += poll_deltas_str
-
-        if (self.DIR_qty_now > self.poll_qty_threshold):
-            poll_str += DIR_label_qty
-        if (self.Can_qty_now > self.poll_qty_threshold):
-            poll_str += Can_label_qty
-
-        poll_str = poll_str.strip()
-        #self.app.title = poll_str
-        app.title = poll_str
-
-        schedule_poll_endtime = time.time()
-        schedule_poll_delta_ns = round(1000 * (schedule_poll_endtime - schedule_poll_starttime), 1)
-
-        report_str = poll_str + " poll_delta=(%s), file_update_delta=(%s)" % (schedule_poll_delta_ns, source_mtime_dhms)
-        sys.stderr.write("%s\n" % str(report_str))
-        sys.stderr.write("\n")
-
-        #   Call EdgeNotifications()
-        self.EdgeNotifications()
-
-        self.poll_count += 1
     #   }}}
 
 
