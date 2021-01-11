@@ -19,6 +19,7 @@ import weakref
 import logging
 import importlib
 import pkgutil
+import webbrowser
 #   }}}1
 #   {{{2
 from decaycalc.decaycalc import DecayCalc
@@ -40,6 +41,9 @@ class PulseApp(rumps.App):
 
     _output_decimals = 2
     _poll_dt = 15
+    _data_delim = ","
+
+    _qty_precision = 2
 
     _delta_now_recent_threshold = 300
     _qty_now_threshold = 0.01
@@ -52,6 +56,10 @@ class PulseApp(rumps.App):
     _data_dir = os.environ.get('mld_logs_schedule')
     _datafile_prefix = "Schedule.calc."
     _datafile_postfix = ".vimgpg"
+
+    _plot_dir = os.environ.get('mld_out_local')
+
+    color_options = [ "blue", "green", "red", "black", "orange" ]
 
     _poll_items_file = [ 'pulse', 'poll-items.txt' ]
     _poll_cols_file = [ 'pulse', 'poll-columns.txt' ]
@@ -79,15 +87,36 @@ class PulseApp(rumps.App):
             _log.error("not found, _data_dir=(%s)" % str(_data_dir))
             sys.exit(2)
 
+        #   Read parameters from respective files _poll_cols_file, _poll_items_file
         self.Read_PollCols()
         self.Read_PollItems()
 
+        #   Initalise qty list
         for loop_label in self._poll_labels:
             self._qty_now.append(0)
 
         self.timer = rumps.Timer(self.func_poll, self._poll_dt)
         self.timer.start()
     #   }}}
+
+
+    @rumps.clicked('Today Plot')
+    def handle_todayPlot(self, _):
+        pass
+        _log.debug("begin")
+        #self.timeplot.AnalyseDayRange(self._data_dir, self.prefix, self.postfix, [ date_start, date_end ], self.labels_list, self.halflives_list, self.onset_lists, self.col_dt, self.col_qty, self.col_label, self.delim, None, self.color_options)
+        date_start = datetime.datetime.now()
+        date_end = datetime.datetime.now()
+        #_plot_dir = "/tmp"
+        try:
+            _path_save = self.timeplot.AnalyseDayRange(self._data_dir, self._datafile_prefix, self._datafile_postfix, [ date_start, date_end ], self._poll_labels, self._poll_halflives, self._poll_onsets, self._poll_cols[2], self._poll_cols[1], self._poll_cols[0], self._data_delim, self._plot_dir, self.color_options)
+            webbrowser.open('file:%s' % self._plot_dir)
+        except Exception as e:
+            _log.error("%s, %s" % (type(e), str(e)))
+        _log.debug("done")
+        #self.timer = rumps.Timer(self.func_poll, self._poll_dt)
+        #self.timer.start()
+
 
     @rumps.clicked('Quit')
     def handle_quit(self, _):
@@ -113,7 +142,6 @@ class PulseApp(rumps.App):
         self._qty_now_previous = self._qty_now
         self._qty_now = []
 
-        col_delim = ","
         col_label = self._poll_cols[0]
         col_qty = self._poll_cols[1]
         col_dt = self._poll_cols[2]
@@ -125,16 +153,29 @@ class PulseApp(rumps.App):
             _log.debug("loop_label=(%s), loop_halflife=(%s), loop_onset=(%s)" % (str(loop_label), str(loop_halflife), str(loop_onset)))
             try:
                 located_filepaths = self.timeplot._GetFiles_Monthly(self._data_dir, self._datafile_prefix, self._datafile_postfix, _now, _now, True)
-                data_dt, data_qty = self.timeplot._ReadData(located_filepaths, loop_label, col_dt, col_qty, col_label, col_delim)
+                data_dt, data_qty = self.timeplot._ReadData(located_filepaths, loop_label, col_dt, col_qty, col_label, self._data_delim)
+                #_log.debug("len(data_dt)=(%s)" % len(data_dt))
 
-                last_dt = sorted(data_dt)[-1]
+                data_dt_sorted = data_dt[:]
+                try:
+                    data_dt_sorted.sort()
+                except Exception as e:
+                    pass
+                last_dt = data_dt_sorted[-1]
+                _log.debug("last_dt=(%s)" % str(last_dt))
                 delta_now.append((_now - last_dt).total_seconds())
 
+                loop_qty = 0
                 loop_qty = self.decaycalc.CalculateAtDT(_now, data_dt, data_qty, loop_halflife, loop_onset)
-                loop_qty = round(loop_qty, 2)
+                loop_qty = round(loop_qty, self._qty_precision)
+
                 self._qty_now.append(loop_qty)
             except Exception as e:
                 _log.error("%s, %s" % (type(e), str(e)))
+                raise Exception("failed to calculate value")
+
+        _log.debug("_qty_now=(%s)" % str(self._qty_now))
+        _log.debug("delta_now=(%s)" % str(delta_now))
 
         poll_str = ""
         delta_now_recent_mins = int(sorted(delta_now)[0] / 60)
