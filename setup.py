@@ -24,6 +24,14 @@ import pkg_resources
 #       }}}
 #   }}}1
 
+
+version = re.search(
+    '^__version__\s*=\s*"(.*)"',
+    open('dtscan/__main__.py').read(),
+    re.M
+    ).group(1)
+
+
 APP = ['pulse.py']
 
 DATA_FILES = []
