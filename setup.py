@@ -5,6 +5,7 @@
 #   }}}1
 from setuptools import setup
 import pkg_resources
+import re
 
 #   Bug with py2app/pyinstaller/setuptools, or, the reason this thing didn't work the first time.
 #   {{{2
@@ -27,7 +28,7 @@ import pkg_resources
 
 version = re.search(
     '^__version__\s*=\s*"(.*)"',
-    open('dtscan/__main__.py').read(),
+    open('pulse/__main__.py').read(),
     re.M
     ).group(1)
 
