@@ -3,12 +3,10 @@
 #   vim: set foldlevel=2 foldcolumn=3: 
 #   }}}1
 #   Imports: 
-#   {{{2
+#   {{{3
 import sys
 import datetime
 import os
-from os.path import expanduser
-from pathlib import Path
 import importlib
 import time
 import math
@@ -24,11 +22,6 @@ import webbrowser
 #   {{{2
 from decaycalc.decaycalc import DecayCalc
 from timeplot.timeplot import TimePlot
-#   Usage:
-#   located_filepaths = self.timeplot._GetFiles_Monthly(self._data_dir, self.prefix, self.postfix, self.dt_start, self.dt_end, True)
-#   results_dt, results_qty = self.timeplot._ReadData(located_filepaths, self.label, self.col_dt, self.col_qty, self.col_label, self.delim)
-#   remaining_qty = self.decaycalc.CalculateAtDT(self.dt_analyse, results_dt, results_qty, self.halflife, self.onset)
-
 
 _log = logging.getLogger('pulse')
 _logging_format="%(funcName)s: %(levelname)s, %(message)s"
@@ -41,10 +34,7 @@ class PulseApp(rumps.App):
 
     _output_decimals = 2
     _poll_dt = 15
-    _data_delim = ","
-
     _qty_precision = 2
-
     _delta_now_recent_threshold = 300
     _qty_now_threshold = 0.01
 
@@ -52,12 +42,11 @@ class PulseApp(rumps.App):
     _data_source_filename = 'Schedule.iphone.log'
 
     _gpgkey_default = "pantheon.redgrey@gpg.key"
-
-    _data_dir = os.environ.get('mld_logs_schedule')
+    _data_dir = os.environ.get('mld_logs_pulse')
+    _plot_dir = os.environ.get('mld_plots_pulse')
     _datafile_prefix = "Schedule.calc."
     _datafile_postfix = ".vimgpg"
-
-    _plot_dir = os.environ.get('mld_out_local')
+    _data_delim = ","
 
     color_options = [ "blue", "green", "red", "black", "orange" ]
 
@@ -66,57 +55,118 @@ class PulseApp(rumps.App):
 
     #   cols: [ label, qty, dt ]
     _poll_cols = []
-
     _poll_labels = []
     _poll_halflives = []
     _poll_onsets = []
-
+    _qty_today = []
     _qty_now = []
     _qty_now_previous = []
-
     _init_string = "Hello There"
 
     def __init__(self):
     #   {{{
         _log.debug("start")
-        _list_menu = [ 'Today Plot', 'Quit' ]
 
-        super().__init__(self._init_string, menu=_list_menu, quit_button=None)
+        #super().__init__(self._init_string, menu=self._list_menu, quit_button=None)
+
+        super().__init__(self._init_string, quit_button=None)
+
+        self.qtytoday_menu_item = rumps.MenuItem("qty:")
+        self.todayplot_menu_item = rumps.MenuItem("Plot Today")
+        self.monthplot_menu_item = rumps.MenuItem("Plot Month")
+        self.allplot_menu_item = rumps.MenuItem("Plot All")
+        self.quit_menu_item = rumps.MenuItem("Quit")
+        self.menu.add(self.qtytoday_menu_item)
+        self.menu.add(self.todayplot_menu_item)
+        self.menu.add(self.monthplot_menu_item)
+        self.menu.add(self.allplot_menu_item)
+        self.menu.add(self.quit_menu_item)
 
         if not os.path.isdir(self._data_dir):
-            _log.error("not found, _data_dir=(%s)" % str(_data_dir))
-            sys.exit(2)
+            _log.warning("mkdir _data_dir=(%s)" % str(_data_dir))
+            os.mkdir(self._data_dir)
+
+        if not os.path.isdir(self._plot_dir):
+            _log.warning("mkdir _plot_dir=(%s)" % str(self._plot_dir))
+            os.mkdir(self._plot_dir)
 
         #   Read parameters from respective files _poll_cols_file, _poll_items_file
-        self.Read_PollCols()
-        self.Read_PollItems()
+        self._ReadResource_Cols()
+        self._ReadResource_Items()
 
         #   Initalise qty list
         for loop_label in self._poll_labels:
             self._qty_now.append(0)
+            self._qty_today.append(0)
 
         self.timer = rumps.Timer(self.func_poll, self._poll_dt)
         self.timer.start()
     #   }}}
 
+    def _Format_QtyToday(self):
+    #   {{{
+        result_str = "qty: "
+        for loop_qty, loop_label in zip(self._qty_today, self._poll_labels):
+            result_str += loop_label[0] + str(loop_qty) + " "
+        result_str = result_str.strip()
+        return result_str
+    #   }}}
 
-    @rumps.clicked('Today Plot')
-    def handle_todayPlot(self, _):
-        pass
+    #   TODO: 2021-01-13T16:26:19AEDT (how to) show plot figure without application closing when plot is closed
+    @rumps.clicked('Plot Today')
+    def handle_plotToday(self, _):
+    #   {{{
         _log.debug("begin")
-        #self.timeplot.AnalyseDayRange(self._data_dir, self.prefix, self.postfix, [ date_start, date_end ], self.labels_list, self.halflives_list, self.onset_lists, self.col_dt, self.col_qty, self.col_label, self.delim, None, self.color_options)
         date_start = datetime.datetime.now()
         date_end = datetime.datetime.now()
         #_plot_dir = "/tmp"
         try:
-            _path_save = self.timeplot.AnalyseDayRange(self._data_dir, self._datafile_prefix, self._datafile_postfix, [ date_start, date_end ], self._poll_labels, self._poll_halflives, self._poll_onsets, self._poll_cols[2], self._poll_cols[1], self._poll_cols[0], self._data_delim, self._plot_dir, self.color_options)
+            self.timeplot.AnalyseDataByDaysList(self._data_dir, self._datafile_prefix, self._datafile_postfix, [ date_start, date_end ], self._poll_labels, self._poll_halflives, self._poll_onsets, self._poll_cols[2], self._poll_cols[1], self._poll_cols[0], self._data_delim, self._plot_dir, self.color_options)
+            #_path_save = _paths_plot_save[0]
             webbrowser.open('file:%s' % self._plot_dir)
+            #   Open plot file itself fails?
+            ##  {{{
+            #_log.debug("_path_save=(%s)" % str(_path_save))
+            #import subprocess, os, platform
+            #if platform.system() == 'Darwin':       # macOS
+            #    subprocess.call(('open', _path_save))
+            #elif platform.system() == 'Windows':    # Windows
+            #    os.startfile(_path_save)
+            #else:                                   # linux variants
+            #    subprocess.call(('xdg-open', _path_save))
+            ##   }}}
         except Exception as e:
             _log.error("%s, %s" % (type(e), str(e)))
         _log.debug("done")
         #self.timer = rumps.Timer(self.func_poll, self._poll_dt)
         #self.timer.start()
+    #   }}}
 
+    @rumps.clicked('Plot Month')
+    def handle_plotMonth(self, _):
+    #   {{{
+        _log.debug("begin")
+        date_month = datetime.datetime.now()
+        try:
+            self.timeplot.AnalyseDataForMonth(self._data_dir, self._datafile_prefix, self._datafile_postfix, date_month, self._poll_labels, self._poll_halflives, self._poll_onsets, self._poll_cols[2], self._poll_cols[1], self._poll_cols[0], self._data_delim, self._plot_dir, self.color_options)
+            webbrowser.open('file:%s' % self._plot_dir)
+        except Exception as e:
+            _log.error("%s, %s" % (type(e), str(e)))
+        _log.debug("done")
+    #   }}}
+
+    @rumps.clicked('Plot All')
+    def handle_plotAll(self, _):
+    #   {{{
+        _log.debug("begin")
+        date_month = datetime.datetime.now()
+        try:
+            self.timeplot.AnalyseDataByMonthForAll(self._data_dir, self._datafile_prefix, self._datafile_postfix, self._poll_labels, self._poll_halflives, self._poll_onsets, self._poll_cols[2], self._poll_cols[1], self._poll_cols[0], self._data_delim, self._plot_dir, self.color_options)
+            webbrowser.open('file:%s' % self._plot_dir)
+        except Exception as e:
+            _log.error("%s, %s" % (type(e), str(e)))
+        _log.debug("done")
+    #   }}}
 
     @rumps.clicked('Quit')
     def handle_quit(self, _):
@@ -131,7 +181,7 @@ class PulseApp(rumps.App):
         _now = datetime.datetime.now()
         _log.debug("_now=(%s)" % str(_now))
 
-        #    def _CopyAndDivideDataByMonth(self, arg_source_path, arg_dest_dir, arg_dest_prefix, arg_dest_postfix, arg_dt_first, arg_dt_last, arg_overwrite=False, arg_includeMonthBefore=False, arg_gpg_key=None):
+        #   Copy any new data from self._data_source_dir to self._data_dir
         try:
             _path_source = os.path.join(self._data_source_dir, self._data_source_filename)
             self.timeplot._CopyAndDivideDataByMonth(_path_source, self._data_dir, self._datafile_prefix, self._datafile_postfix, _now, _now, True, True, self._gpgkey_default)
@@ -141,6 +191,7 @@ class PulseApp(rumps.App):
 
         self._qty_now_previous = self._qty_now
         self._qty_now = []
+        self._qty_today = []
 
         col_label = self._poll_cols[0]
         col_qty = self._poll_cols[1]
@@ -162,18 +213,19 @@ class PulseApp(rumps.App):
                 except Exception as e:
                     pass
                 last_dt = data_dt_sorted[-1]
-                _log.debug("last_dt=(%s)" % str(last_dt))
                 delta_now.append((_now - last_dt).total_seconds())
+                _log.debug("last_dt=(%s)" % str(last_dt))
 
-                loop_qty = 0
-                loop_qty = self.decaycalc.CalculateAtDT(_now, data_dt, data_qty, loop_halflife, loop_onset)
-                loop_qty = round(loop_qty, self._qty_precision)
-
-                self._qty_now.append(loop_qty)
+                loop_qty_today = self.decaycalc.TotalQtyForDay(_now, data_dt, data_qty)
+                self._qty_today.append(loop_qty_today)
+                loop_qty_now = self.decaycalc.CalculateAtDT(_now, data_dt, data_qty, loop_halflife, loop_onset)
+                loop_qty_now = round(loop_qty_now, self._qty_precision)
+                self._qty_now.append(loop_qty_now)
             except Exception as e:
                 _log.error("%s, %s" % (type(e), str(e)))
                 raise Exception("failed to calculate value")
 
+        _log.debug("_qty_today=(%s)" % str(self._qty_today))
         _log.debug("_qty_now=(%s)" % str(self._qty_now))
         _log.debug("delta_now=(%s)" % str(delta_now))
 
@@ -184,12 +236,12 @@ class PulseApp(rumps.App):
         _log.debug("delta_now_recent_mins=(%s)" % str(delta_now_recent_mins))
 
         try:
-            for loop_i, (loop_qty, loop_label) in enumerate(zip(self._qty_now, self._poll_labels)):
-                _log.debug("loop_label=(%s), loop_qty=(%s)" % (str(loop_label), str(loop_qty)))
+            for loop_i, (loop_qty_now, loop_label) in enumerate(zip(self._qty_now, self._poll_labels)):
+                _log.debug("loop_label=(%s), loop_qty_now=(%s)" % (str(loop_label), str(loop_qty_now)))
                 #_log.debug(self._qty_now_previous[loop_i])
-                if (loop_qty >= self._qty_now_threshold):
-                    poll_str += str(loop_label[0]) + str(loop_qty)
-                    if (loop_qty > self._qty_now_previous[loop_i]):
+                if (loop_qty_now >= self._qty_now_threshold):
+                    poll_str += str(loop_label[0]) + str(loop_qty_now)
+                    if (loop_qty_now > self._qty_now_previous[loop_i]):
                         poll_str += "🔺"
                     else:
                         poll_str += " "
@@ -198,10 +250,12 @@ class PulseApp(rumps.App):
 
         poll_str = poll_str.strip()
         _log.debug("poll_str=(%s)" % str(poll_str))
+
+        self.qtytoday_menu_item.title = self._Format_QtyToday()
         self.title = poll_str
     #   }}}
 
-    def Read_PollItems(self):
+    def _ReadResource_Items(self):
     #   {{{
         """Read resource file _poll_items_file to _poll_labels, _poll_halflives, _poll_onsets as tab-delimited values"""
         file_poll_items = importlib.resources.open_text(*self._poll_items_file)
@@ -219,9 +273,9 @@ class PulseApp(rumps.App):
         _log.debug("_poll_onsets=(%s)" % str(self._poll_onsets))
     #   }}}
 
-    def Read_PollCols(self):
+    def _ReadResource_Cols(self):
     #   {{{
-        """Read resource file _poll_cols_file to _poll_cols as tab-delimited integers"""
+        """Read resource file _poll_cols_file to _poll_cols as tab-delimited integers. Columns: [ label, qty, datetime ]"""
         file_poll_cols = importlib.resources.open_text(*self._poll_cols_file)
         _log.debug("file_poll_cols=(%s)" % str(file_poll_cols))
         filedata = file_poll_cols.read().strip()
