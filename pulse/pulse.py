@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #   VIM SETTINGS: {{{3
 #   vim: set tabstop=4 modeline modelines=10 foldmethod=marker:
 #   vim: set foldlevel=2 foldcolumn=3: 
@@ -83,7 +84,7 @@ class PulseApp(rumps.App):
         self.menu.add(self.quit_menu_item)
 
         if not os.path.isdir(self._data_dir):
-            _log.warning("mkdir _data_dir=(%s)" % str(_data_dir))
+            _log.warning("mkdir _data_dir=(%s)" % str(self._data_dir))
             os.mkdir(self._data_dir)
 
         if not os.path.isdir(self._plot_dir):
