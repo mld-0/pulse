@@ -6,6 +6,7 @@
 from setuptools import setup
 import pkg_resources
 import re
+import pulse
 
 #   Bug with py2app/pyinstaller/setuptools, or, the reason this thing didn't work the first time.
 #   {{{2
@@ -33,7 +34,8 @@ version = re.search(
     ).group(1)
 
 
-APP = ['pulse.py']
+#APP = ['pulse.py']
+APP = [ 'pulse/__main__.py'  ]
 
 DATA_FILES = []
 OPTIONS = {
@@ -43,7 +45,9 @@ OPTIONS = {
         'CFBundleShortVersionString': '0.1',
         'LSUIElement': True,
     },
-    'packages': ['rumps'],
+    'packages': ['rumps', 'pulse' ],
+    'includes': [ 'pulse' ],
+    'argv_emulation': True,
 }
 
 setup(
@@ -51,7 +55,7 @@ setup(
     name="Pulse",
     data_files=DATA_FILES,
     options={'py2app': OPTIONS},
-    setup_requires=['py2app'], install_requires=['rumps']
+    setup_requires=['py2app', 'pulse'], install_requires=['rumps', 'pulse']
 )
 
 
