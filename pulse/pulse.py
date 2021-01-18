@@ -23,6 +23,8 @@ import webbrowser
 #   {{{2
 from timeplot.decaycalc import DecayCalc
 from timeplot.timeplot import TimePlot
+from timeplot.plotdecayqtys import PlotDecayQtys
+from timeplot.util import TimePlotUtils
 
 _log = logging.getLogger('pulse')
 _logging_format="%(funcName)s: %(levelname)s, %(message)s"
@@ -32,6 +34,7 @@ logging.basicConfig(level=logging.DEBUG, format=_logging_format, datefmt=_loggin
 class PulseApp(rumps.App):
     timeplot = TimePlot()
     decaycalc = DecayCalc()
+    plotdecayqtys = PlotDecayQtys()
 
     _output_decimals = 2
     _poll_dt = 15
@@ -185,7 +188,7 @@ class PulseApp(rumps.App):
         #   Copy any new data from self._data_source_dir to self._data_dir
         try:
             _path_source = os.path.join(self._data_source_dir, self._data_source_filename)
-            self.timeplot._CopyAndDivideDataByMonth(_path_source, self._data_dir, self._datafile_prefix, self._datafile_postfix, _now, _now, True, True, self._gpgkey_default)
+            TimePlotUtils._CopyData_DivideByMonth(_path_source, self._data_dir, self._datafile_prefix, self._datafile_postfix, _now, _now, True, True, self._gpgkey_default)
         except Exception as e:
             _log.error("%s, %s" % (type(e), str(e)))
             raise Exception("failed to copy data")
@@ -194,9 +197,10 @@ class PulseApp(rumps.App):
         self._qty_now = []
         self._qty_today = []
 
-        col_label = self._poll_cols[0]
-        col_qty = self._poll_cols[1]
-        col_dt = self._poll_cols[2]
+        self.plotdecayqtys.data_column_label = self._poll_cols[0]
+        self.plotdecayqtys.data_column_qty = self._poll_cols[1]
+        self.plotdecayqtys.data_column_dt = self._poll_cols[2]
+        self.plotdecayqtys.data_delim = self._data_delim
 
         last_dt = None
         delta_now = []
@@ -204,8 +208,9 @@ class PulseApp(rumps.App):
         for loop_label, loop_halflife, loop_onset in zip(self._poll_labels, self._poll_halflives, self._poll_onsets):
             _log.debug("loop_label=(%s), loop_halflife=(%s), loop_onset=(%s)" % (str(loop_label), str(loop_halflife), str(loop_onset)))
             try:
-                located_filepaths = self.timeplot._GetFiles_Monthly(self._data_dir, self._datafile_prefix, self._datafile_postfix, _now, _now, True)
-                data_dt, data_qty = self.timeplot._ReadData(located_filepaths, loop_label, col_dt, col_qty, col_label, self._data_delim)
+                located_filepaths = TimePlotUtils._GetFiles_FromMonthlyRange(self._data_dir, self._datafile_prefix, self._datafile_postfix, _now, _now, True)
+                #data_dt, data_qty = self.plotdecayqtys._ReadData(located_filepaths, loop_label, col_dt, col_qty, col_label, self._data_delim)
+                data_dt, data_qty = self.plotdecayqtys._ReadData(located_filepaths, loop_label)
                 #_log.debug("len(data_dt)=(%s)" % len(data_dt))
 
                 data_dt_sorted = data_dt[:]
