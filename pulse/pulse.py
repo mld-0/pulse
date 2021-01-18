@@ -21,7 +21,7 @@ import pkgutil
 import webbrowser
 #   }}}1
 #   {{{2
-from decaycalc.decaycalc import DecayCalc
+from timeplot.decaycalc import DecayCalc
 from timeplot.timeplot import TimePlot
 
 _log = logging.getLogger('pulse')
@@ -230,30 +230,30 @@ class PulseApp(rumps.App):
         _log.debug("_qty_now=(%s)" % str(self._qty_now))
         _log.debug("delta_now=(%s)" % str(delta_now))
 
-        poll_str = ""
-        delta_now_recent_mins = int(sorted(delta_now)[0] / 60)
-        if (delta_now_recent_mins < self._delta_now_recent_threshold):
-            poll_str += str(delta_now_recent_mins) + "⏳"
-        _log.debug("delta_now_recent_mins=(%s)" % str(delta_now_recent_mins))
-
+        poll_str_qty = ""
+        poll_str_delta = ""
         try:
-            for loop_i, (loop_qty_now, loop_label) in enumerate(zip(self._qty_now, self._poll_labels)):
+            for loop_i, (loop_qty_now, loop_label, loop_delta_now) in enumerate(zip(self._qty_now, self._poll_labels, delta_now)):
                 _log.debug("loop_label=(%s), loop_qty_now=(%s)" % (str(loop_label), str(loop_qty_now)))
                 #_log.debug(self._qty_now_previous[loop_i])
                 if (loop_qty_now >= self._qty_now_threshold):
-                    poll_str += str(loop_label[0]) + str(loop_qty_now)
+                    poll_str_qty += str(loop_label[0]) + str(loop_qty_now)
                     if (loop_qty_now > self._qty_now_previous[loop_i]):
-                        poll_str += "🔺"
+                        poll_str_qty += "🔺"
                     else:
-                        poll_str += " "
+                        poll_str_qty += " "
+                    poll_str_delta += str(int(loop_delta_now / 60)) + " "
         except Exception as e:
             _log.error("%s, %s" % (type(e), str(e)))
 
-        poll_str = poll_str.strip()
-        _log.debug("poll_str=(%s)" % str(poll_str))
+        poll_str_qty = poll_str_qty.strip()
+        poll_str_delta = poll_str_delta.strip()
+
+        poll_title_str = poll_str_delta + "⏳" + poll_str_qty
+        _log.debug("poll_title_str=(%s)" % str(poll_title_str))
 
         self.qtytoday_menu_item.title = self._Format_QtyToday()
-        self.title = poll_str
+        self.title = poll_title_str
     #   }}}
 
     def _ReadResource_Items(self):
