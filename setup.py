@@ -55,7 +55,8 @@ setup(
     name="Pulse",
     data_files=DATA_FILES,
     options={'py2app': OPTIONS},
-    setup_requires=['py2app', 'pulse'], install_requires=['rumps', 'pulse']
+    setup_requires=['py2app', 'pulse'], 
+    install_requires=['rumps', 'pulse', 'pandas' ]
 )
 
 

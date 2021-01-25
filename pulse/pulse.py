@@ -20,26 +20,40 @@ import importlib
 import pkgutil
 import webbrowser
 import pandas
+import tempfile
 #   }}}1
 #   {{{2
+from dtscan.dtscan import DTScanner
 from timeplot.decaycalc import DecayCalc
 from timeplot.timeplot import TimePlot
 from timeplot.plotdecayqtys import PlotDecayQtys
 from timeplot.util import TimePlotUtils
+from subprocess import Popen, PIPE, STDOUT
 
 _log = logging.getLogger('pulse')
 _logging_format="%(funcName)s: %(levelname)s, %(message)s"
 _logging_datetime="%Y-%m-%dT%H:%M:%S%Z"
 logging.basicConfig(level=logging.DEBUG, format=_logging_format, datefmt=_logging_datetime)
 
+#   TODO: 2021-01-25T21:37:26AEDT pulse, hide matplotlib debug output during startup
+
+#   TODO: 2021-01-25T21:41:41AEDT pulse, as per vimh, menu item with splitsum for day -> for zsh_history -> file itself uses epochs -> must be filtered somehow, excessively long
+
 class PulseApp(rumps.App):
     timeplot = TimePlot()
     decaycalc = DecayCalc()
     plotdecayqtys = PlotDecayQtys()
+    dtscanner = DTScanner()
 
-    _poll_dt = 15
+    _path_temp_dir = tempfile.mkdtemp()
+
+    _poll_dt = 30
     _qty_precision = 2
     _qty_now_threshold = 0.01
+
+    _splitsum_file = os.environ.get('mld_log_vimh')
+    _splitsum_split_delta =  300
+    _splitsum_label =  'vimh'
 
     _datasource_dir = os.environ.get('mld_icloud_workflowDocuments')
     _datasource_filename = 'Schedule.iphone.log'
@@ -49,6 +63,8 @@ class PulseApp(rumps.App):
     _datacopy_postfix = ".vimgpg"
 
     _output_plot_dir = os.environ.get('mld_plots_pulse')
+    #path_vimh_local = os.environ.get('mld_log_vimh')
+    path_sysout_cloud = os.environ.get('mld_out_cloud_shared')
 
     _gpgkey_default = "pantheon.redgrey@gpg.key"
     _data_delim = ","
@@ -78,12 +94,14 @@ class PulseApp(rumps.App):
 
         super().__init__(self._init_string, quit_button=None)
 
-        self.qtytoday_menu_item = rumps.MenuItem("qty:")
-        self.todayplot_menu_item = rumps.MenuItem("Plot Today")
-        self.monthplot_menu_item = rumps.MenuItem("Plot Month")
-        self.allplot_menu_item = rumps.MenuItem("Plot All")
+        self.qtytodayvimh_menu_item = rumps.MenuItem("qty:")
+        self.splitsums_menu_item = rumps.MenuItem("sums:")
+        self.todayplot_menu_item = rumps.MenuItem("Plot Schedule Today")
+        self.monthplot_menu_item = rumps.MenuItem("Plot Schedule Month")
+        self.allplot_menu_item = rumps.MenuItem("Plot Schedule All")
         self.quit_menu_item = rumps.MenuItem("Quit")
-        self.menu.add(self.qtytoday_menu_item)
+        self.menu.add(self.qtytodayvimh_menu_item)
+        self.menu.add(self.splitsums_menu_item)
         self.menu.add(self.todayplot_menu_item)
         self.menu.add(self.monthplot_menu_item)
         self.menu.add(self.allplot_menu_item)
@@ -108,19 +126,78 @@ class PulseApp(rumps.App):
 
         self.timer = rumps.Timer(self.func_poll, self._poll_dt)
         self.timer.start()
+
+        #self._GetVimhElapsedToday()
     #   }}}
 
-    def _Format_QtyToday(self):
+    #def _GetVimhElapsedToday(self):
+    #    _cmd = [ "cat", "-v", "/Users/mldavis/Dropbox/_sysout-cloud/*/logs/vimh.vi.txt", "|", "grep", "2021-01-19", "|", "sort", "|", "dtscan", "splitsum" ]
+    #    p = Popen(_cmd, stdout=PIPE, stdin=PIPE, stderr=PIPE)
+    #    result_data_decrypt, result_stderr = p.communicate()
+    #    result_str = result_data_decrypt.decode()
+    #    result_stderr = result_stderr.decode()
+    #    rc = p.returncode
+    #    _log.debug("result_str=(%s)" % str(result_str))
+    #    _log.debug("rc=(%s)" % str(rc))
+
+    def _GetAndFormat_SplitSums(self):
+        result_str = ""
+        today_date_str = datetime.datetime.now().strftime("%Y-%m-%d")
+        _log.debug("today_date_str=(%s)" % str(today_date_str))
+
+        if not (os.path.exists(self._path_temp_dir)):
+            os.mkdir(self._path_temp_dir)
+
+    #for loop_filepath, loop_split_delta, loop_label in zip(self._splitsum_files_list, self._splitsum_split_deltas, self._splitsum_labels):
+        #_log.debug("loop_filepath=(%s)" % str(loop_filepath))
+        #_log.debug("loop_split_delta=(%s)" % str(loop_split_delta))
+        #_log.debug("loop_label=(%s)" % str(loop_label))
+
+        #   Copy lines from loop_filepath to path_temp if they contain today_date_str
+        f = open(self._splitsum_file, "r")
+        #path_temp = os.path.join(self._path_temp_dir, "splitsum.temp.%s" % datetime.datetime.now().strftime("%s.%f"))
+        path_temp = os.path.join(self._path_temp_dir, "splitsum.temp")
+        _log.debug("path_temp=(%s)" % str(path_temp))
+        f_temp = open(path_temp, "w")
+        for loop_line in f:
+            if today_date_str in loop_line:
+                f_temp.write(loop_line)
+        f_temp.close()
+        f.close()
+
+        #   find splitsum for today for path_temp
+        try:
+            f_temp = open(path_temp, "r")
+            loop_results = self.dtscanner._Interface_SplitSum(f_temp, False, "d", self._splitsum_split_delta, None, None, None, None, None, None, None, False)
+            f_temp.close()
+            _log.debug("loop_results=(%s)" % str(loop_results))
+        except Exception as e:
+            _log.debug("%s, %s" % (type(e), str(e)))
+
+        #   TODO: 2021-01-25T21:43:18AEDT rather than verifying len(loop_results) <= 1, verify date of loop_results_last matches today
+        if (len(loop_results) > 1):
+            raise Exception("Results from only one day, imply results should only be length 1, len(loop_results)=(%s), loop_results=(%s)" % (len(loop_results), str(loop_results)))
+
+        loop_results_last = loop_results[-1]
+        loop_elapsed_str = loop_results_last[0]
+
+            #   append to result_str with loop_label
+        result_str += self._splitsum_label + " " + loop_elapsed_str + " "
+
+        return result_str.strip()
+
+
+    def _Format_QtyTodayVimh(self):
     #   {{{
         result_str = "qty: "
         for loop_qty, loop_label in zip(self._qty_today, self._data_labels):
-            result_str += loop_label[0] + str(loop_qty) + " "
+            result_str += loop_label[0] + "" + str(loop_qty) + " "
         result_str = result_str.strip()
         return result_str
     #   }}}
 
     #   TODO: 2021-01-13T16:26:19AEDT (how to) show plot figure without application closing when plot is closed
-    @rumps.clicked('Plot Today')
+    @rumps.clicked('Plot Schedule Today')
     def handle_plotToday(self, _):
     #   {{{
         _log.debug("begin")
@@ -138,7 +215,7 @@ class PulseApp(rumps.App):
         _log.debug("done")
     #   }}}
 
-    @rumps.clicked('Plot Month')
+    @rumps.clicked('Plot Schedule Month')
     def handle_plotMonth(self, _):
     #   {{{
         _log.debug("begin")
@@ -160,7 +237,7 @@ class PulseApp(rumps.App):
         _log.debug("done")
     #   }}}
 
-    @rumps.clicked('Plot All')
+    @rumps.clicked('Plot Schedule All')
     def handle_plotAll(self, _):
     #   {{{
         _log.debug("begin")
@@ -272,7 +349,10 @@ class PulseApp(rumps.App):
         poll_title_str = poll_str_delta + "⏳" + poll_str_qty
         _log.debug("poll_title_str=(%s)" % str(poll_title_str))
 
-        self.qtytoday_menu_item.title = self._Format_QtyToday()
+        self.qtytodayvimh_menu_item.title = self._Format_QtyTodayVimh()
+        self.splitsums_menu_item.title = self._GetAndFormat_SplitSums()
+
+
         self.title = poll_title_str
     #   }}}
 
