@@ -21,6 +21,7 @@ import pkgutil
 import webbrowser
 import pandas
 import tempfile
+import dateutil
 #   }}}1
 #   {{{2
 from dtscan.dtscan import DTScanner
@@ -130,28 +131,15 @@ class PulseApp(rumps.App):
         #self._GetVimhElapsedToday()
     #   }}}
 
-    #def _GetVimhElapsedToday(self):
-    #    _cmd = [ "cat", "-v", "/Users/mldavis/Dropbox/_sysout-cloud/*/logs/vimh.vi.txt", "|", "grep", "2021-01-19", "|", "sort", "|", "dtscan", "splitsum" ]
-    #    p = Popen(_cmd, stdout=PIPE, stdin=PIPE, stderr=PIPE)
-    #    result_data_decrypt, result_stderr = p.communicate()
-    #    result_str = result_data_decrypt.decode()
-    #    result_stderr = result_stderr.decode()
-    #    rc = p.returncode
-    #    _log.debug("result_str=(%s)" % str(result_str))
-    #    _log.debug("rc=(%s)" % str(rc))
-
-    def _GetAndFormat_SplitSums(self):
+    def _GetVimh_SplitSum_Today(self):
+    #   {{{
+        """Get splits sum (using dtscanner) in file self._splitsum_file for today"""
         result_str = ""
         today_date_str = datetime.datetime.now().strftime("%Y-%m-%d")
+        _starttime = datetime.datetime.now()
         _log.debug("today_date_str=(%s)" % str(today_date_str))
-
         if not (os.path.exists(self._path_temp_dir)):
             os.mkdir(self._path_temp_dir)
-
-    #for loop_filepath, loop_split_delta, loop_label in zip(self._splitsum_files_list, self._splitsum_split_deltas, self._splitsum_labels):
-        #_log.debug("loop_filepath=(%s)" % str(loop_filepath))
-        #_log.debug("loop_split_delta=(%s)" % str(loop_split_delta))
-        #_log.debug("loop_label=(%s)" % str(loop_label))
 
         #   Copy lines from loop_filepath to path_temp if they contain today_date_str
         f = open(self._splitsum_file, "r")
@@ -165,10 +153,11 @@ class PulseApp(rumps.App):
         f_temp.close()
         f.close()
 
-        #   find splitsum for today for path_temp
+        #   find splitsum for (lines copied to) path_temp
         try:
             f_temp = open(path_temp, "r")
-            loop_results = self.dtscanner._Interface_SplitSum(f_temp, False, "d", self._splitsum_split_delta, None, None, None, None, None, None, None, False)
+            #loop_results = self.dtscanner._Interface_SplitSum(f_temp, False, "d", self._splitsum_split_delta, None, None, None, None, None, None, None, False)
+            loop_results = self.dtscanner._Interface_SplitSum(f_temp, False, "d", self._splitsum_split_delta, False)
             f_temp.close()
             _log.debug("loop_results=(%s)" % str(loop_results))
         except Exception as e:
@@ -176,18 +165,19 @@ class PulseApp(rumps.App):
 
         #   TODO: 2021-01-25T21:43:18AEDT rather than verifying len(loop_results) <= 1, verify date of loop_results_last matches today
         if (len(loop_results) > 1):
-            raise Exception("Results from only one day, imply results should only be length 1, len(loop_results)=(%s), loop_results=(%s)" % (len(loop_results), str(loop_results)))
-
+            _log.warning("Results from only one day, imply results should only be length 1, len(loop_results)=(%s), loop_results=(%s)" % (len(loop_results), str(loop_results)))
+        _timedone = datetime.datetime.now()
+        _elapsed = _timedone - _starttime
+        _log.debug("_elapsed=(%s)" % str(_elapsed))
         loop_results_last = loop_results[-1]
         loop_elapsed_str = loop_results_last[0]
 
-            #   append to result_str with loop_label
+        #   append to result_str with loop_label
         result_str += self._splitsum_label + " " + loop_elapsed_str + " "
-
         return result_str.strip()
+    #   }}}
 
-
-    def _Format_QtyTodayVimh(self):
+    def _GetQtys_Sum_Today(self):
     #   {{{
         result_str = "qty: "
         for loop_qty, loop_label in zip(self._qty_today, self._data_labels):
@@ -302,7 +292,9 @@ class PulseApp(rumps.App):
             _log.debug("loop_label=(%s), loop_halflife=(%s), loop_onset=(%s)" % (str(loop_label), str(loop_halflife), str(loop_onset)))
             try:
                 located_filepaths = TimePlotUtils._GetFiles_FromMonthlyRange(self._datacopy_dir, self._datacopy_prefix, self._datacopy_postfix, _now, _now, True)
+
                 data_dt, data_qty = self.plotdecayqtys._ReadQtyScheduleData(located_filepaths, loop_label)
+
                 #_log.debug("len(data_dt)=(%s)" % len(data_dt))
 
                 data_dt_sorted = data_dt[:]
@@ -349,9 +341,8 @@ class PulseApp(rumps.App):
         poll_title_str = poll_str_delta + "⏳" + poll_str_qty
         _log.debug("poll_title_str=(%s)" % str(poll_title_str))
 
-        self.qtytodayvimh_menu_item.title = self._Format_QtyTodayVimh()
-        self.splitsums_menu_item.title = self._GetAndFormat_SplitSums()
-
+        self.qtytodayvimh_menu_item.title = self._GetQtys_Sum_Today()
+        self.splitsums_menu_item.title = self._GetVimh_SplitSum_Today()
 
         self.title = poll_title_str
     #   }}}
@@ -387,7 +378,6 @@ class PulseApp(rumps.App):
         file_data_cols.close()
         _log.debug("_data_cols=(%s)" % str(self._data_cols))
     #   }}}
-
 
 #   }}}1
 
