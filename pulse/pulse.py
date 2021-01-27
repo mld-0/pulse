@@ -166,11 +166,17 @@ class PulseApp(rumps.App):
         #   TODO: 2021-01-25T21:43:18AEDT rather than verifying len(loop_results) <= 1, verify date of loop_results_last matches today
         if (len(loop_results) > 1):
             _log.warning("Results from only one day, imply results should only be length 1, len(loop_results)=(%s), loop_results=(%s)" % (len(loop_results), str(loop_results)))
+
         _timedone = datetime.datetime.now()
         _elapsed = _timedone - _starttime
         _log.debug("_elapsed=(%s)" % str(_elapsed))
-        loop_results_last = loop_results[-1]
-        loop_elapsed_str = loop_results_last[0]
+
+        try:
+            loop_results_last = loop_results[-1]
+            loop_elapsed_str = loop_results_last[0]
+        except Exception as e:
+            _log.debug("%s, %s" % (type(e), str(e)))
+            loop_elapsed_str = "-"
 
         #   append to result_str with loop_label
         result_str += self._splitsum_label + " " + loop_elapsed_str + " "
@@ -179,10 +185,18 @@ class PulseApp(rumps.App):
 
     def _GetQtys_Sum_Today(self):
     #   {{{
-        result_str = "qty: "
-        for loop_qty, loop_label in zip(self._qty_today, self._data_labels):
-            result_str += loop_label[0] + "" + str(loop_qty) + " "
-        result_str = result_str.strip()
+        result_str_label = "qty: "
+        result_str = ""
+        try:
+            for loop_qty, loop_label in zip(self._qty_today, self._data_labels):
+                result_str += loop_label[0] + "" + str(loop_qty) + " "
+            result_str = result_str.strip()
+        except Exception as e:
+            _log.debug("%s, %s" % (type(e), str(e)))
+            result_str = "-"
+
+        result_str = result_str_label + result_str
+
         return result_str
     #   }}}
 
