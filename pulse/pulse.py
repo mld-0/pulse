@@ -54,7 +54,9 @@ class PulseApp(rumps.App):
 
     _path_temp_dir = tempfile.mkdtemp()
 
-    _poll_dt = 30
+    _poll_dt_qtys = 20
+    _poll_dt_splitsums = 60
+
     _qty_precision = 2
     _qty_now_threshold = 0.01
 
@@ -137,8 +139,12 @@ class PulseApp(rumps.App):
             self._qty_now.append(0)
             self._qty_today.append(0)
 
-        self.timer = rumps.Timer(self.func_poll, self._poll_dt)
-        self.timer.start()
+        self.timer_qtys = rumps.Timer(self.func_poll_qtys, self._poll_dt_qtys)
+        self.timer_qtys.start()
+
+        self.timer_splitsums = rumps.Timer(self.func_poll_splitsums, self._poll_dt_splitsums)
+        self.timer_splitsums.start()
+
 
         #self._GetVimhElapsedToday()
     #   }}}
@@ -339,7 +345,7 @@ class PulseApp(rumps.App):
         rumps.quit_application()
     #   }}}
 
-    def func_poll(self, sender):
+    def func_poll_qtys(self, sender):
     #   {{{
         _now = datetime.datetime.now()
         _log.debug("_now=(%s)" % str(_now))
@@ -418,10 +424,11 @@ class PulseApp(rumps.App):
         _log.debug("poll_title_str=(%s)" % str(poll_title_str))
 
         self.qtytodayvimh_menu_item.title = self._GetQtys_Sum_Today()
-        self.splitsums_menu_item.title = self._GetVimh_SplitSum_Today()
-
         self.title = poll_title_str
     #   }}}
+
+    def func_poll_splitsums(self, sender):
+        self.splitsums_menu_item.title = self._GetVimh_SplitSum_Today()
 
     def _ReadResource_DataLabels(self):
     #   {{{
