@@ -22,8 +22,12 @@ import webbrowser
 import pandas
 import tempfile
 import dateutil
+import subprocess
+import pprint
 #   }}}1
 #   {{{2
+logging.getLogger('matplotlib').setLevel(logging.WARNING)
+
 from dtscan.dtscan import DTScanner
 from timeplot.decaycalc import DecayCalc
 from timeplot.timeplot import TimePlot
@@ -35,6 +39,8 @@ _log = logging.getLogger('pulse')
 _logging_format="%(funcName)s: %(levelname)s, %(message)s"
 _logging_datetime="%Y-%m-%dT%H:%M:%S%Z"
 logging.basicConfig(level=logging.DEBUG, format=_logging_format, datefmt=_logging_datetime)
+#logging.getLogger("matplotlib").setLevel(logging.WARNING)
+
 
 #   TODO: 2021-01-25T21:37:26AEDT pulse, hide matplotlib debug output during startup
 
@@ -52,9 +58,15 @@ class PulseApp(rumps.App):
     _qty_precision = 2
     _qty_now_threshold = 0.01
 
-    _splitsum_file = os.environ.get('mld_log_vimh')
+    #   Update to mld_log_timestamps when said file has been created during loop
+    _splitsum_vimh_file = os.environ.get('mld_log_vimh')
+    #_splitsum_vimh_file = os.environ.get('mld_log_timestamps')
+
+       
+    #_script_combine_timestamps = os.environ.get('mld_combine_timestamps_local')
+
     _splitsum_split_delta =  300
-    _splitsum_label =  'vimh'
+    _splitsum_label =  'splitsum'
 
     _datasource_dir = os.environ.get('mld_icloud_workflowDocuments')
     _datasource_filename = 'Schedule.iphone.log'
@@ -131,9 +143,27 @@ class PulseApp(rumps.App):
         #self._GetVimhElapsedToday()
     #   }}}
 
+    def _Zsh_History_Recent(self):
+    #   {{{
+        """Get last 1000 items in zsh history file, with iso timestamps, as list-of-strings"""
+        _cmd_history = """
+        #!/bin/zsh --login
+        export HISTFILE=~/.zsh_history 
+        export HISTSIZE=1000
+        fc -R 
+        fc -l -t "%FT%H:%M:%S%Z" 0 | cut -c 8- 
+        """
+        _cmd_zsh_history = [ '/bin/zsh', '-c', _cmd_history ]
+        p = subprocess.Popen(_cmd_zsh_history, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        stdout, stderr = p.communicate()
+        result_history = stdout.split('\n')
+        return result_history
+    #   }}}
+                
+    #   TODO: 2021-02-01T17:31:00AEDT add to file path_temp, shell (zsh) history lines for today
     def _GetVimh_SplitSum_Today(self):
     #   {{{
-        """Get splits sum (using dtscanner) in file self._splitsum_file for today"""
+        """Get splits sum (using dtscanner) in file self._splitsum_vimh_file for today"""
         result_str = ""
         today_date_str = datetime.datetime.now().strftime("%Y-%m-%d")
         _starttime = datetime.datetime.now()
@@ -142,43 +172,75 @@ class PulseApp(rumps.App):
             os.mkdir(self._path_temp_dir)
 
         #   Copy lines from loop_filepath to path_temp if they contain today_date_str
-        f = open(self._splitsum_file, "r")
+        _log.debug("_splitsum_vimh_file\n%s" % str(self._splitsum_vimh_file))
+        f = open(self._splitsum_vimh_file, "r")
         #path_temp = os.path.join(self._path_temp_dir, "splitsum.temp.%s" % datetime.datetime.now().strftime("%s.%f"))
-        path_temp = os.path.join(self._path_temp_dir, "splitsum.temp")
-        _log.debug("path_temp=(%s)" % str(path_temp))
-        f_temp = open(path_temp, "w")
+
+        path_temp_unsorted = os.path.join(self._path_temp_dir, "splitsum.temp.unsorted")
+        path_temp_sorted = os.path.join(self._path_temp_dir, "splitsum.temp")
+
+        _log.debug("path_temp_unsorted\n%s" % str(path_temp_unsorted))
+
+        result_history = self._Zsh_History_Recent()
+
+        f_temp = open(path_temp_unsorted, "w")
         for loop_line in f:
             if today_date_str in loop_line:
                 f_temp.write(loop_line)
-        f_temp.close()
+        #f_temp.close()
         f.close()
 
+        #   Continue: 2021-02-01T17:43:49AEDT add zsh history entries from today to path_temp. Does path_temp need to be sorted -> tell dtscanner to do so?
+        for loop_history_item in result_history:
+            if today_date_str in loop_history_item:
+                f_temp.write(loop_history_item)
+                f_temp.write('\n')
+        f_temp.close()
+
+        try:
+            #   Sort file path_temp?
+            f_sorted = open(path_temp_sorted, "w")
+            with open(path_temp_unsorted, 'r') as r:
+                for line in sorted(r):
+                    f_sorted.write(line)
+                    #_log.debug("line=(%s)" % str(line))
+            f_sorted.close()
+        except Exception as e:
+           _log.error("%s, %s, failed to sort path_temp_sorted" % (type(e), str(e)))
+
+        _log.debug("path_temp_sorted\n%s" % str(path_temp_sorted))
+
+        
         #   find splitsum for (lines copied to) path_temp
         try:
-            f_temp = open(path_temp, "r")
-            #loop_results = self.dtscanner._Interface_SplitSum(f_temp, False, "d", self._splitsum_split_delta, None, None, None, None, None, None, None, False)
-            loop_results = self.dtscanner._Interface_SplitSum(f_temp, False, "d", self._splitsum_split_delta, False)
-            f_temp.close()
-            _log.debug("loop_results=(%s)" % str(loop_results))
-        except Exception as e:
-            _log.debug("%s, %s" % (type(e), str(e)))
+            f_sorted = open(path_temp_sorted, "r")
 
-        #   TODO: 2021-01-25T21:43:18AEDT rather than verifying len(loop_results) <= 1, verify date of loop_results_last matches today
-        if (len(loop_results) > 1):
-            _log.warning("Results from only one day, imply results should only be length 1, len(loop_results)=(%s), loop_results=(%s)" % (len(loop_results), str(loop_results)))
+            #   Ongoing: 2021-02-01T21:31:05AEDT presence of datetimes in vimh/zsh history causes date range beyond current day to be analysed -> potential bug) using results from wrong day, potential optimisation) limit splitsum search to current day
+            splitsum_results = self.dtscanner.Interface_SplitSum(f_sorted, False, "d", self._splitsum_split_delta, False)
+
+            f_sorted.close()
+            _log.debug("splitsum_results=(%s)" % str(splitsum_results))
+        except Exception as e:
+            _log.error("%s, %s" % (type(e), str(e)))
+
+        #   TODO: 2021-01-25T21:43:18AEDT rather than verifying len(splitsum_results) <= 1, verify date of splitsum_results_last matches today
+        if (len(splitsum_results) > 1):
+            #   TODO: 2021-02-01T21:42:32AEDT ensure only splitsum results for current day (therefore list of length 1) can be returned from Interface_SplitSum
+            #_log.warning("Results from only one day, imply results should only be length 1, len(splitsum_results)=(%s), splitsum_results=(%s)" % (len(splitsum_results), str(splitsum_results)))
+            raise Exception("Results from only one day, imply results should only be length 1, len(splitsum_results)=(%s), splitsum_results=(%s)" % (len(splitsum_results), str(splitsum_results)))
 
         _timedone = datetime.datetime.now()
         _elapsed = _timedone - _starttime
         _log.debug("_elapsed=(%s)" % str(_elapsed))
 
         try:
-            loop_results_last = loop_results[-1]
-            loop_elapsed_str = loop_results_last[0]
+            splitsum_results_last = splitsum_results[-1]
+            loop_elapsed_str = splitsum_results_last[0]
         except Exception as e:
-            _log.debug("%s, %s" % (type(e), str(e)))
+            _log.error("%s, %s" % (type(e), str(e)))
             loop_elapsed_str = "-"
 
-        #   append to result_str with loop_label
+        #   append to result_str with loop_label and return
         result_str += self._splitsum_label + " " + loop_elapsed_str + " "
         return result_str.strip()
     #   }}}
