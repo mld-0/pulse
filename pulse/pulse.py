@@ -63,7 +63,6 @@ class PulseApp(rumps.App):
     #   Update to mld_log_timestamps when said file has been created during loop
     _splitsum_vimh_file = os.environ.get('mld_log_vimh')
     #_splitsum_vimh_file = os.environ.get('mld_log_timestamps')
-
        
     #_script_combine_timestamps = os.environ.get('mld_combine_timestamps_local')
 
@@ -101,6 +100,9 @@ class PulseApp(rumps.App):
 
     _init_string = "Hello There"
 
+    #   If True, do not add duplicate lines to files in _datacopy_dir. Line values contain seconds - we presume two identical entries to be a double-bounce, not intentional.
+    _remove_log_qty_duplicates = True
+
     def __init__(self):
     #   {{{
         _log.debug("start")
@@ -123,12 +125,12 @@ class PulseApp(rumps.App):
         self.menu.add(self.quit_menu_item)
 
         if not os.path.isdir(self._datacopy_dir):
-            _log.warning("mkdir _datacopy_dir=(%s)" % str(self._datacopy_dir))
-            os.mkdir(self._datacopy_dir)
+            _log.warning("makedirs _datacopy_dir=(%s)" % str(self._datacopy_dir))
+            os.makedirs(self._datacopy_dir)
 
         if not os.path.isdir(self._output_plot_dir):
-            _log.warning("mkdir _output_plot_dir=(%s)" % str(self._output_plot_dir))
-            os.mkdir(self._output_plot_dir)
+            _log.warning("makedirs _output_plot_dir=(%s)" % str(self._output_plot_dir))
+            os.makedirs(self._output_plot_dir)
 
         #   Read parameters from respective files _data_cols_file, _data_labels_file
         self._ReadResource_DataCols()
@@ -353,10 +355,10 @@ class PulseApp(rumps.App):
         #   Copy any new data from self._datasource_dir to self._datacopy_dir
         try:
             _path_source = os.path.join(self._datasource_dir, self._datasource_filename)
-            TimePlotUtils._CopyData_DivideByMonth(_path_source, self._datacopy_dir, self._datacopy_prefix, self._datacopy_postfix, _now, _now, True, True, self._gpgkey_default)
+            TimePlotUtils.CopyLogDataFile_DivideByMonth(_path_source, self._datacopy_dir, self._datacopy_prefix, self._datacopy_postfix, _now, _now, arg_overwrite=True, arg_includeMonthBefore=True, arg_gpg_key=self._gpgkey_default, arg_remove_duplicate_lines=self._remove_log_qty_duplicates)
         except Exception as e:
-            _log.error("%s, %s" % (type(e), str(e)))
-            raise Exception("failed to copy data")
+            #_log.error("%s, %s" % (type(e), str(e)))
+            raise Exception("%s, %s, failed to copy data" % (type(e), str(e)))
 
         self._qty_now_previous = self._qty_now
         self._qty_now = []
