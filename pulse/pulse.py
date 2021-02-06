@@ -224,7 +224,7 @@ class PulseApp(rumps.App):
             f_sorted = open(path_temp_sorted, "r")
 
             #   Ongoing: 2021-02-01T21:31:05AEDT presence of datetimes in vimh/zsh history causes date range beyond current day to be analysed -> potential bug) using results from wrong day, potential optimisation) limit splitsum search to current day
-            splitsum_results = self.dtscanner.Interface_SplitSum(f_sorted, False, "d", self._splitsum_split_delta, False)
+            splitsum_results = self.dtscanner.Interface_SplitSum(f_sorted, False, "d", self._splitsum_split_delta)
 
             f_sorted.close()
             _log.debug("splitsum_results=(%s)" % str(splitsum_results))
