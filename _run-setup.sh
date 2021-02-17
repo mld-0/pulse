@@ -15,6 +15,7 @@ set -o pipefail  # don't hide errors within pipes
 
 _pulse_dir="$mld_src/pulse"
 _bin_python_build="$HOME/.pyenv/shims/python3"
+_bin_python_build="/usr/local/bin/python3"
 _pulse_setup="setup.py"
 _pulse_flag_output_build_log=0
 _pulse_flag_delete_dir_tmp=0

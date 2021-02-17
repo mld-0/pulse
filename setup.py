@@ -35,7 +35,9 @@ version = re.search(
 
 
 #APP = ['pulse.py']
-APP = [ 'pulse/__main__.py'  ]
+#APP = [ 'pulse/__main__.py'  ]
+APP = [ 'main.py'  ]
+packages = ['rumps', 'pulse', 'dtscan', 'pandas', 'dateparser' ]
 
 DATA_FILES = []
 OPTIONS = {
@@ -45,8 +47,8 @@ OPTIONS = {
         'CFBundleShortVersionString': '0.1',
         'LSUIElement': True,
     },
-    'packages': ['rumps', 'pulse' ],
-    'includes': [ 'pulse' ],
+    'packages': packages,
+    'includes': packages,
     'argv_emulation': True,
 }
 
@@ -55,8 +57,8 @@ setup(
     name="Pulse",
     data_files=DATA_FILES,
     options={'py2app': OPTIONS},
-    setup_requires=['py2app', 'pulse'], 
-    install_requires=['rumps', 'pulse', 'pandas' ]
+    setup_requires=packages, 
+    install_requires=packages
 )
 
 

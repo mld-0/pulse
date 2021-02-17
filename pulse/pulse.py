@@ -217,14 +217,13 @@ class PulseApp(rumps.App):
            _log.error("%s, %s, failed to sort path_temp_sorted" % (type(e), str(e)))
 
         _log.debug("path_temp_sorted\n%s" % str(path_temp_sorted))
-
         
         #   find splitsum for (lines copied to) path_temp
         try:
             f_sorted = open(path_temp_sorted, "r")
 
             #   Ongoing: 2021-02-01T21:31:05AEDT presence of datetimes in vimh/zsh history causes date range beyond current day to be analysed -> potential bug) using results from wrong day, potential optimisation) limit splitsum search to current day
-            splitsum_results = self.dtscanner.Interface_SplitSum(f_sorted, False, "d", self._splitsum_split_delta)
+            splitsum_results = self.dtscanner.splitsums(f_sorted, False, "d", self._splitsum_split_delta)
 
             f_sorted.close()
             _log.debug("splitsum_results=(%s)" % str(splitsum_results))
@@ -233,7 +232,7 @@ class PulseApp(rumps.App):
 
         #   TODO: 2021-01-25T21:43:18AEDT rather than verifying len(splitsum_results) <= 1, verify date of splitsum_results_last matches today
         if (len(splitsum_results) > 1):
-            #   TODO: 2021-02-01T21:42:32AEDT ensure only splitsum results for current day (therefore list of length 1) can be returned from Interface_SplitSum
+            #   TODO: 2021-02-01T21:42:32AEDT ensure only splitsum results for current day (therefore list of length 1) can be returned from splitsums
             #_log.warning("Results from only one day, imply results should only be length 1, len(splitsum_results)=(%s), splitsum_results=(%s)" % (len(splitsum_results), str(splitsum_results)))
             raise Exception("Results from only one day, imply results should only be length 1, len(splitsum_results)=(%s), splitsum_results=(%s)" % (len(splitsum_results), str(splitsum_results)))
 
@@ -243,7 +242,7 @@ class PulseApp(rumps.App):
 
         try:
             splitsum_results_last = splitsum_results[-1]
-            loop_elapsed_str = splitsum_results_last[0]
+            loop_elapsed_str = splitsum_results_last[1]
         except Exception as e:
             _log.error("%s, %s" % (type(e), str(e)))
             loop_elapsed_str = "-"
