@@ -63,7 +63,7 @@ class PulseApp(rumps.App):
     #   Update to mld_log_timestamps when said file has been created during loop
     _splitsum_vimh_file = os.environ.get('mld_log_vimh')
     #_splitsum_vimh_file = os.environ.get('mld_log_timestamps')
-       
+
     #_script_combine_timestamps = os.environ.get('mld_combine_timestamps_local')
 
     _splitsum_split_delta =  300
@@ -133,8 +133,11 @@ class PulseApp(rumps.App):
             os.makedirs(self._output_plot_dir)
 
         #   Read parameters from respective files _data_cols_file, _data_labels_file
-        self._ReadResource_DataCols()
-        self._ReadResource_DataLabels()
+        try:
+            self._ReadResource_DataCols()
+            self._ReadResource_DataLabels()
+        except Exception as e:
+            _log.error("Failed ReadResource, e=(%s)" % str(e))
 
         #   Initalise qty list
         for loop_label in self._data_labels:
@@ -144,9 +147,8 @@ class PulseApp(rumps.App):
         self.timer_qtys = rumps.Timer(self.func_poll_qtys, self._poll_dt_qtys)
         self.timer_qtys.start()
 
-        self.timer_splitsums = rumps.Timer(self.func_poll_splitsums, self._poll_dt_splitsums)
-        self.timer_splitsums.start()
-
+        #self.timer_splitsums = rumps.Timer(self.func_poll_splitsums, self._poll_dt_splitsums)
+        #self.timer_splitsums.start()
 
         #self._GetVimhElapsedToday()
     #   }}}
@@ -167,7 +169,8 @@ class PulseApp(rumps.App):
         result_history = stdout.split('\n')
         return result_history
     #   }}}
-                
+
+    #   TODO: 2021-03-12T16:11:06AEDT handle creation of combined log file elsewhere
     #   TODO: 2021-02-01T17:31:00AEDT add to file path_temp, shell (zsh) history lines for today
     def _GetVimh_SplitSum_Today(self):
     #   {{{
@@ -217,7 +220,7 @@ class PulseApp(rumps.App):
            _log.error("%s, %s, failed to sort path_temp_sorted" % (type(e), str(e)))
 
         _log.debug("path_temp_sorted\n%s" % str(path_temp_sorted))
-        
+
         #   find splitsum for (lines copied to) path_temp
         try:
             f_sorted = open(path_temp_sorted, "r")
@@ -310,6 +313,7 @@ class PulseApp(rumps.App):
         _log.debug("done")
     #   }}}
 
+    #   TODO: 2021-03-12T17:24:39AEDT replace _ReadQtyScheduleData() with schedulereader.ReadItemData() (and plotdecayqtys attributes)
     @rumps.clicked('Plot Schedule All')
     def handle_plotAll(self, _):
     #   {{{
@@ -346,6 +350,7 @@ class PulseApp(rumps.App):
         rumps.quit_application()
     #   }}}
 
+    #   TODO: 2021-03-12T16:28:16AEDT replace plotdecayqtys._ReadQtyScheduleData() with schedulereader.ReadItemData (and plotdecayqtys attributes)
     def func_poll_qtys(self, sender):
     #   {{{
         _now = datetime.datetime.now()
