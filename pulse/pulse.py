@@ -26,7 +26,6 @@ import subprocess
 import pprint
 #   }}}1
 #   {{{2
-logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
 from dtscan.dtscan import DTScanner
 from timeplot.decaycalc import DecayCalc
@@ -35,11 +34,13 @@ from timeplot.plotdecayqtys import PlotDecayQtys
 from timeplot.util import TimePlotUtils
 from subprocess import Popen, PIPE, STDOUT
 
-_log = logging.getLogger('pulse')
 _logging_format="%(funcName)s: %(levelname)s, %(message)s"
 _logging_datetime="%Y-%m-%dT%H:%M:%S%Z"
 logging.basicConfig(level=logging.DEBUG, format=_logging_format, datefmt=_logging_datetime)
-#logging.getLogger("matplotlib").setLevel(logging.WARNING)
+
+_log = logging.getLogger('pulse')
+logging.getLogger('matplotlib').setLevel(logging.WARNING)
+logging.getLogger('pulse').setLevel(logging.DEBUG)
 
 
 #   TODO: 2021-01-25T21:37:26AEDT pulse, hide matplotlib debug output during startup
@@ -105,7 +106,7 @@ class PulseApp(rumps.App):
 
     def __init__(self):
     #   {{{
-        _log.debug("start")
+        _log.debug("__init__")
 
         #super().__init__(self._init_string, menu=self._list_menu, quit_button=None)
 
@@ -361,7 +362,7 @@ class PulseApp(rumps.App):
             _path_source = os.path.join(self._datasource_dir, self._datasource_filename)
             TimePlotUtils.CopyLogDataFile_DivideByMonth(_path_source, self._datacopy_dir, self._datacopy_prefix, self._datacopy_postfix, _now, _now, arg_overwrite=True, arg_includeMonthBefore=True, arg_gpg_key=self._gpgkey_default, arg_remove_duplicate_lines=self._remove_log_qty_duplicates)
         except Exception as e:
-            #_log.error("%s, %s" % (type(e), str(e)))
+            _log.error("%s, %s" % (type(e), str(e)))
             raise Exception("%s, %s, failed to copy data" % (type(e), str(e)))
 
         self._qty_now_previous = self._qty_now
